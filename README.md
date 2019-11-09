@@ -29,6 +29,5 @@ $ ./dupimgfinder --rootpath=<rootpath> --recursive=true
 ```
 
 # TODO
-- Conurrent support
 - Copy the duplicate files as softlinks to a duplicate folder.
 

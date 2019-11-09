@@ -20,16 +20,15 @@ import (
 var (
 	imageFormat    = map[string]func(io.Reader) (image.Image, error){"jpg": jpeg.Decode, "jpeg": jpeg.Decode, "png": png.Decode, "gif": gif.Decode}
 	noOfDuplicates = 0
+	store          *hasher.ImgsimStore
+	ch             = make(chan string, 10)
 )
 
 func findImageFiles(rootPath *string, recursive bool) {
 
-	// Create an empty store.
-	store := hasher.NewImgsimStore()
-
 	if recursive {
 		err := filepath.Walk(*rootPath, func(path string, info os.FileInfo, err error) error {
-			findDupImage(store, path)
+			ch <- path
 			return nil
 		})
 
@@ -43,14 +42,15 @@ func findImageFiles(rootPath *string, recursive bool) {
 		}
 		for _, f := range files {
 			if !f.IsDir() {
-				findDupImage(store, *rootPath+"/"+f.Name())
+				ch <- (*rootPath) + "/" + f.Name()
 			}
 		}
 	}
+	close(ch)
 
 }
 
-func findDupImage(store *hasher.ImgsimStore, imgPath string) {
+func findDupImage(imgPath string) {
 
 	ext := filepath.Ext(imgPath)
 	if !strings.HasPrefix(ext, ".") {
@@ -90,7 +90,6 @@ func main() {
 	rootFolder := flag.String("rootpath", "", "RootFolder fullpath")
 	recursive := flag.Bool("recursive", false, "Recursive search in subfolders.")
 	flag.Parse()
-	flag.PrintDefaults()
 
 	if "" == *rootFolder {
 		wd, err := os.Getwd()
@@ -102,8 +101,13 @@ func main() {
 		*rootFolder = wd
 	}
 
-	//find out the duplicate image files
-	findImageFiles(rootFolder, *recursive)
-	fmt.Println("Total Number of duplicate files found ", noOfDuplicates)
+	// Create an empty store.
+	store = hasher.NewImgsimStore()
 
+	//find out the duplicate image files
+	go findImageFiles(rootFolder, *recursive)
+	for path := range ch {
+		findDupImage(path)
+	}
+	fmt.Println("Total Number of duplicate files found ", noOfDuplicates)
 }
