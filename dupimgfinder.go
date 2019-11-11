@@ -24,6 +24,7 @@ var (
 	ch             = make(chan string, 10)
 )
 
+//findImageFiles function get the files in the folder and add it to the channel
 func findImageFiles(rootPath *string, recursive bool) {
 
 	if recursive {
@@ -50,7 +51,8 @@ func findImageFiles(rootPath *string, recursive bool) {
 
 }
 
-func findDupImage(imgPath string) {
+//findDupImage reads the file path from channel and query the store to check the match
+func findDupImage(imgPath string, fileNameMatch bool) {
 
 	ext := filepath.Ext(imgPath)
 	if !strings.HasPrefix(ext, ".") {
@@ -76,9 +78,18 @@ func findDupImage(imgPath string) {
 	hash := imgsim.AverageHash(img)
 	matches := store.Query(hash)
 	if matches != nil {
+
+		if fileNameMatch {
+			_, file := filepath.Split(fmt.Sprintf("%s", matches))
+			_, file1 := filepath.Split(imgPath)
+
+			if file != file1 {
+				return
+			}
+		}
+
 		fmt.Println(matches, " matches ", imgPath)
 		noOfDuplicates++
-
 	} else {
 		store.Add(imgPath, hash)
 	}
@@ -89,6 +100,8 @@ func main() {
 	//Argument parsing
 	rootFolder := flag.String("rootpath", "", "RootFolder fullpath")
 	recursive := flag.Bool("recursive", false, "Recursive search in subfolders.")
+	fileNameMatch := flag.Bool("filenamematch", true, "Search result should match file name.")
+
 	flag.Parse()
 
 	if "" == *rootFolder {
@@ -107,7 +120,7 @@ func main() {
 	//find out the duplicate image files
 	go findImageFiles(rootFolder, *recursive)
 	for path := range ch {
-		findDupImage(path)
+		findDupImage(path, *fileNameMatch)
 	}
 	fmt.Println("Total Number of duplicate files found ", noOfDuplicates)
 }
